@@ -15,34 +15,6 @@
 #include <functional>
 #include <algorithm>
 
-template<class T> class RandomCandidate: public panther::NextCandidateDistribution<T> {
-public:
-    void nextCandidate(int n, T* point, const T* lower_bound, const T* upper_bound, T delta) {
-        for (int i = 0; i < n; i++) {
-            T num;
-            do {
-                num = point[i] + (2 * ((double)rand() / (RAND_MAX)) - 1) * (upper_bound[i] - lower_bound[i]) * delta;
-            } while (num >= upper_bound[i] || num <= lower_bound[i]);
-            point[i] = num;
-        }
-    }
-};
-
-template<class T> class Metropolis: public panther::AcceptanceFunction<T> {
-public:
-    bool acceptance(const T state1, const T state2, const size_t t) {
-        return (state1 > state2) ? (1 >= (double)rand() / (RAND_MAX)) :
-            (exp((state1 - state2) * pow(t, -1)) >= (double)rand() / (RAND_MAX));
-    }
-};
-
-template<class T> class Cooling: public panther::CoolingSchedule<T> {
-public:
-    T coolingSchedule(const size_t max_k, size_t iteration) {
-        return max_k - iteration;
-    }
-};
-
 namespace panther {
     template<class T> class NextCandidateDistribution {
     public:
@@ -66,6 +38,7 @@ namespace panther {
 
     template<class T> class SimulatedAnnealing : public BlackBoxSolver<T> {
     public:
+        SimulatedAnnealing(NextCandidateDistribution<T>& next, AcceptanceFunction<T>& accept, CoolingSchedule<T>& t) : D(next), A(accept), Temp(t) {}
         struct Option {
 
             //number of iterations of simulated_Annealing(create a stoping rule!!!!!)
@@ -139,12 +112,41 @@ namespace panther {
         }
 
     private:
-        Option opt;
         NextCandidateDistribution<T>& D;
         AcceptanceFunction<T>& A;
         CoolingSchedule<T>& Temp;
+        Option opt;
     };
 }
+
+template<class T> class RandomCandidate : public panther::NextCandidateDistribution<T> {
+public:
+    void nextCandidate(int n, T* point, const T* lower_bound, const T* upper_bound, T delta) {
+        for (int i = 0; i < n; i++) {
+            T num;
+            do {
+                num = point[i] + (2 * ((double)rand() / (RAND_MAX)) - 1) * (upper_bound[i] - lower_bound[i]) * delta;
+            } while (num >= upper_bound[i] || num <= lower_bound[i]);
+            point[i] = num;
+        }
+    }
+};
+
+template<class T> class Metropolis : public panther::AcceptanceFunction<T> {
+public:
+    bool acceptance(const T state1, const T state2, const size_t t) {
+        return (state1 > state2) ? (1 >= (double)rand() / (RAND_MAX)) :
+            (exp((state1 - state2) * pow(t, -1)) >= (double)rand() / (RAND_MAX));
+    }
+};
+
+template<class T> class Cooling : public panther::CoolingSchedule<T> {
+public:
+    T coolingSchedule(const size_t max_k, size_t iteration) {
+        return max_k - iteration;
+    }
+};
+
 
 //#endif
 
@@ -156,12 +158,15 @@ double func(const double* const x) {
 using namespace panther;
 
 int main() {
+    RandomCandidate<double> D;
+    Metropolis<double> A;
+    Cooling<double> Temp;
     double num1[1], num2[1];
     num1[0] = -30;
     num2[0] = 70;
     double num[1];
     std::fill(num, num + 1, 20);
-    SimulatedAnnealing<double> SA;
+    SimulatedAnnealing<double> SA(D, A, Temp);
     std::cout << SA.about();
     std::cout << SA.search(1, num, num1, num2, func);
     return 0;
